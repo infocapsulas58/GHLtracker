@@ -3,7 +3,8 @@
  * Plugin Name: Go High Level UTM Tracker
  * Description: Conserva primera y ultima atribucion y restaura sus parametros en paginas seleccionadas antes de que External Tracking registre la visita.
  * Version: 1.3.0
- * Author: Connection Pro
+ * Author: Codework Venezuela
+ * Author URI: https://codeworkvenezuela.com/
  * Requires at least: 5.3
  * Requires PHP: 7.4
  * License: GPL-2.0-or-later
