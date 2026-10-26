@@ -1,4 +1,9 @@
-Go High Level UTM Tracker 1.2.1
+Go High Level UTM Tracker 1.3.0
+
+CAMBIOS 1.3.0
+- En modo persistente el tiempo de conservacion se indica en dias (1 a 90). En modo sesion sigue en minutos. Internamente se guarda en minutos, compatible con versiones anteriores.
+- Ayuda contextual (icono ?) en cada ajuste del panel, con explicacion y ejemplos.
+- Snippet de diagnostico: muestra "no aplica" cuando el bridge o External Tracking no estan en la pagina, en vez de un false enganoso.
 
 CAMBIOS 1.2.1
 - SiteGround: exclusion por contenido del script inline (sgo_javascript_combine_excluded_inline_content). Los filtros por handle de 1.2.0 no aplicaban a un script inline.
