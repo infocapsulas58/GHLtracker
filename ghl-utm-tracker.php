@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Go High Level UTM Tracker
  * Description: Conserva primera y ultima atribucion y restaura sus parametros en paginas seleccionadas antes de que External Tracking registre la visita.
- * Version: 1.3.0
+ * Version: 1.3.1
  * Author: Codework Venezuela
  * Author URI: https://codeworkvenezuela.com/
  * Requires at least: 5.3
@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) { exit; }
 
 final class GHL_UTM_Tracker {
     const OPTION = 'ghlut_settings';
-    const VER = '1.3.0';
+    const VER = '1.3.1';
     const MARKER = 'ghlut-early-bridge';
     const KNOWN_KEYS = array('utm_source','utm_medium','utm_campaign','utm_content','utm_term','utm_id','gclid','gbraid','wbraid','gad_source','gad_campaignid','msclkid','fbclid','campaign_id','ad_group_id','ad_id','utm_matchtype','utm_keyword','ctwa_clid','ttclid','li_fat_id');
     private static $instance = null;
@@ -48,7 +48,7 @@ final class GHL_UTM_Tracker {
     }
     public static function defaults() {
         return array('enabled' => 0, 'scope' => 'selected', 'pages' => array(), 'ttl' => 120, 'mode' => 'session', 'debug' => 0,
-          'extra_keys' => '');
+          'extra_keys' => '', 'hide_internal_referrer' => 1);
     }
     public function options() { return wp_parse_args((array)get_option(self::OPTION, array()), self::defaults()); }
     public function action_links($links) {
@@ -81,7 +81,8 @@ final class GHL_UTM_Tracker {
             return preg_match('/^[a-z][a-z0-9_]{0,49}$/', $key) && !in_array($key, $known, true);
         });
         return array('enabled'=>empty($v['enabled'])?0:1, 'scope'=>$scope, 'pages'=>$pages, 'ttl'=>$ttl, 'mode'=>$mode,
-          'debug'=>empty($v['debug'])?0:1, 'extra_keys'=>implode(', ', $extra));
+          'debug'=>empty($v['debug'])?0:1, 'extra_keys'=>implode(', ', $extra),
+          'hide_internal_referrer'=>empty($v['hide_internal_referrer'])?0:1);
     }
     // Help icon with a hover/focus tooltip next to a setting label.
     private function tip($html) {
@@ -140,6 +141,7 @@ final class GHL_UTM_Tracker {
                 <p class="description">Cada entrada tiene vencimiento fijo: navegar no renueva automaticamente el plazo.</p>
               </td></tr>
               <tr><th scope="row">Parametros adicionales<?php echo $this->tip('El plugin solo captura parametros conocidos: <code>utm_*</code>, <code>gclid</code>, <code>fbclid</code>, <code>msclkid</code>, <code>ttclid</code> y similares. Cualquier otro se ignora.<br><br>Escribe aqui nombres propios para tratarlos igual. Ejemplo: con <code>promo, ref</code>, la visita <code>/?promo=VERANO24&amp;ref=juan</code> conserva esos valores hasta la pagina de destino.<br><br>Reglas: separados por comas o espacios, maximo 30, empiezan con letra y solo usan minusculas, numeros y <code>_</code>. Solo sirven en GHL si los lees, por ejemplo con un campo oculto del formulario. No uses datos personales como <code>email</code>.'); ?></th><td><input type="text" class="large-text" name="<?php echo esc_attr($name); ?>[extra_keys]" value="<?php echo esc_attr($o['extra_keys']); ?>" placeholder="ejemplo: parametro_propio, tracking_key"><p class="description">Separados por comas. Los parametros UTM y clics publicitarios habituales ya vienen incluidos. No agregues contrasenas, tokens ni datos personales.</p></td></tr>
+              <tr><th scope="row">Referrer interno<?php echo $this->tip('Cuando el visitante llega a una pagina de destino desde otra pagina del mismo sitio, el navegador informa esa pagina como origen (referrer). GoHighLevel puede clasificar entonces la visita como <strong>Referral</strong> en vez de <strong>Paid Search</strong>, aunque la URL tenga las UTM.<br><br>Con esta opcion, en las paginas donde hay parametros de campana se oculta el referrer <strong>solo si es del propio sitio</strong>. Un origen externo real (Google, Facebook...) no se modifica.<br><br>Otros scripts de esa pagina, como GA4 o Meta Pixel, tampoco veran la pagina interna anterior.'); ?></th><td><label><input type="checkbox" name="<?php echo esc_attr($name); ?>[hide_internal_referrer]" value="1" <?php checked($o['hide_internal_referrer'],1); ?>> Ocultar el referrer del propio sitio en las paginas de destino</label><p class="description">Recomendado para que GoHighLevel clasifique la ultima atribucion por sus UTM.</p></td></tr>
               <tr><th scope="row">Diagnostico<?php echo $this->tip('Muestra en la consola del navegador (F12 &gt; Console) mensajes como "Ultima atribucion restaurada en la pagina".<br><br>Solo los ven los administradores conectados; los visitantes no ven nada. No imprime los valores de UTM ni de los click ID. Desactivalo cuando termines de probar.'); ?></th><td><label><input type="checkbox" name="<?php echo esc_attr($name); ?>[debug]" value="1" <?php checked($o['debug'],1); ?>> Mostrar mensajes de diagnostico en consola (solo para administradores conectados)</label><p class="description">No imprime valores completos de identificadores de clic.</p></td></tr>
             </table>
             <?php submit_button('Guardar configuracion'); ?>
@@ -174,6 +176,7 @@ final class GHL_UTM_Tracker {
   'Scripts External Tracking':g.length,
   'Parametros de marketing en URL':new URL(location.href).searchParams.toString().length>0,
   'Restauracion':!s?na:state.restored===true,
+  'Referrer interno oculto':!s?na:state.referrerHidden===true,
   'Modo':state.mode||na
  });
 })();</textarea>
@@ -207,7 +210,7 @@ final class GHL_UTM_Tracker {
         $extra = preg_split('/[\s,]+/', trim((string)$o['extra_keys']));
         $keys = array_values(array_unique(array_filter(array_merge(self::KNOWN_KEYS,$extra))));
         $config = array('keys'=>$keys,'restore'=>$restore,'ttl'=>(int)$o['ttl']*60000,
-          'mode'=>$o['mode'], 'debug'=>(bool)$o['debug'] && is_user_logged_in() && current_user_can('manage_options'));
+          'mode'=>$o['mode'], 'hideRef'=>!empty($o['hide_internal_referrer']), 'debug'=>(bool)$o['debug'] && is_user_logged_in() && current_user_can('manage_options'));
         echo "\n<script id=\"" . self::MARKER . "\" data-cfasync=\"false\" data-nowprocket=\"1\" nowprocket data-no-optimize=\"1\" data-no-defer=\"1\">\n";
         // Marker comment lets optimizers that match inline content (WP Rocket, SiteGround, Autoptimize) exclude this script.
         echo '/* ' . self::MARKER . ' */(function(c){' . "\n";
@@ -216,7 +219,7 @@ final class GHL_UTM_Tracker {
         'use strict';
         var KEY='ghlut_attribution_v2';
         var now=Date.now();
-        window.__ghlutRuntime={executed:true,restored:false,mode:c.mode};
+        window.__ghlutRuntime={executed:true,restored:false,referrerHidden:false,mode:c.mode};
         function debug(msg){if(c.debug&&window.console)console.info('[GHL UTM Tracker] '+msg);}
         function valid(t){return t&&typeof t==='object'&&typeof t.ts==='number'&&t.ts<=now&&now-t.ts<=c.ttl&&t.params&&typeof t.params==='object';}
         function matches(a,b){var ka=Object.keys(a||{}),kb=Object.keys(b||{});return ka.length===kb.length&&ka.every(function(k){return b[k]===a[k];});}
@@ -267,6 +270,17 @@ final class GHL_UTM_Tracker {
             window.history.replaceState(window.history.state,'',url.href);
             window.__ghlutRuntime.restored=true;
             debug('Ultima atribucion restaurada en la pagina.');
+          }
+          // GHL classifies a visit with a referrer as Referral even when it carries UTM, so an
+          // internal referrer on a page with campaign parameters is hidden. External ones are kept.
+          if(c.hideRef&&c.restore&&(count||window.__ghlutRuntime.restored)&&document.referrer){
+            var ref=null;
+            try{ref=new URL(document.referrer);}catch(e){}
+            if(ref&&ref.origin===url.origin){
+              Object.defineProperty(document,'referrer',{configurable:true,get:function(){return '';}});
+              window.__ghlutRuntime.referrerHidden=true;
+              debug('Referrer interno oculto.');
+            }
           }
         }catch(e){debug('No se pudo almacenar o restaurar atribucion.');}
         })(<?php echo wp_json_encode($config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>);

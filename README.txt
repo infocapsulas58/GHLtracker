@@ -1,4 +1,8 @@
-Go High Level UTM Tracker 1.3.0
+Go High Level UTM Tracker 1.3.1
+
+CAMBIOS 1.3.1
+- Nueva opcion "Referrer interno" (activada por defecto): en las paginas de destino con parametros de campana oculta el referrer cuando es del propio sitio, para que GoHighLevel no clasifique la ultima atribucion como Referral. Los referrers externos no se modifican.
+- El snippet de diagnostico incluye "Referrer interno oculto".
 
 CAMBIOS 1.3.0
 - En modo persistente el tiempo de conservacion se indica en dias (1 a 90). En modo sesion sigue en minutos. Internamente se guarda en minutos, compatible con versiones anteriores.
